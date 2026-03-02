@@ -83,6 +83,13 @@ app.get("/proxy", async (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Content-Type", contentType);
 
+    if (req.query.download === "1") {
+      res.set(
+         "Content-Disposition",
+         "attachment; filename=video.mp4"
+      );
+    }
+
     response.body.pipe(res);
 
   } catch (err) {
@@ -106,3 +113,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server running on port", PORT);
 });
+
