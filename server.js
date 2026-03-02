@@ -1,17 +1,3 @@
-import express from "express";
-import fetch from "node-fetch";
-
-const app = express();
-
-/* 🔐 Allowed Domains */
-const ALLOWED_HOSTS = [
-  "akamai.net.in",
-  "classx.co.in",
-  "cloud-front.in",
-  "liveclasses.cloud-front.in"
-];
-
-/* 🔥 PROXY ROUTE */
 app.get("/proxy", async (req, res) => {
 
   const target = req.query.url;
@@ -21,7 +7,6 @@ app.get("/proxy", async (req, res) => {
 
     const urlObj = new URL(target);
 
-    /* 🔐 Security: Allow only specific domains */
     const allowed = ALLOWED_HOSTS.some(domain =>
       urlObj.hostname.endsWith(domain)
     );
@@ -30,7 +15,6 @@ app.get("/proxy", async (req, res) => {
       return res.status(403).send("Domain not allowed");
     }
 
-    /* 🔥 Fetch from target with custom headers */
     const response = await fetch(target, {
       headers: {
         Referer: "https://test.akamai.net.in/",
@@ -39,27 +23,46 @@ app.get("/proxy", async (req, res) => {
       }
     });
 
-    /* 🔥 Copy important headers */
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Content-Type", response.headers.get("content-type") || "application/octet-stream");
+    const contentType = response.headers.get("content-type") || "";
 
-    /* 🔥 Stream directly */
+    // 🔥 If m3u8 → rewrite
+    if (contentType.includes("application/vnd.apple.mpegurl")) {
+
+      let body = await response.text();
+
+      const baseUrl = target.substring(0, target.lastIndexOf("/") + 1);
+
+      body = body.split("\n").map(line => {
+
+        if (line && !line.startsWith("#")) {
+
+          // if relative path
+          if (!line.startsWith("http")) {
+            const absolute = baseUrl + line;
+            return `/proxy?url=${encodeURIComponent(absolute)}`;
+          }
+
+          // if absolute
+          return `/proxy?url=${encodeURIComponent(line)}`;
+        }
+
+        return line;
+      }).join("\n");
+
+      res.set("Content-Type", "application/vnd.apple.mpegurl");
+      res.set("Access-Control-Allow-Origin", "*");
+
+      return res.send(body);
+    }
+
+    // 🔥 Non-m3u8 files (ts, mp4)
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Content-Type", contentType);
+
     response.body.pipe(res);
 
   } catch (err) {
-    console.error("Proxy error:", err.message);
+    console.error("Proxy error:", err);
     res.status(500).send("Proxy Error");
   }
-});
-
-/* 🔥 Root check */
-app.get("/", (req, res) => {
-  res.send("Proxy running 🚀");
-});
-
-/* 🔥 Dynamic Port (Render compatible) */
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Server running on port", PORT);
 });
