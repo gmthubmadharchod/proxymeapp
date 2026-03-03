@@ -7,7 +7,7 @@ const app = express();
 const ALLOWED_HOSTS = [
   "akamai.net.in",
   "classx.co.in",
-  "cloud-front.in"
+  "cloud-front.in",
   "appx.co.in"
 ];
 
@@ -114,5 +114,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Server running on port", PORT);
 });
+
 
 
